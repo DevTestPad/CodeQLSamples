@@ -25,7 +25,7 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: csharp
-        queries: +security-and-quality,./codeql/custom-queries/csharp/custom-checks.qls
+        config-file: ./codeql-config.yml
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3

@@ -1,0 +1,4 @@
+name: "CodeQL Configuration"
+disable-default-queries: false
+queries:
+  - uses: ./codeql/custom-queries/csharp/BadCatchBlock.ql
