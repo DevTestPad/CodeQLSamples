@@ -115,6 +115,7 @@ namespace HelloWorld
             // SAFE: No multi-threading context
             localDict.Add("key1", 1);
             localDict["key2"] = 2;
+            localDict["key3"] = 2;
             
             if (localDict.ContainsKey("key1"))
             {
