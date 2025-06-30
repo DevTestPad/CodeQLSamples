@@ -1,2 +1,1 @@
-- import: codeql-suites/csharp-security-and-quality.qls
 - query: BadCatchBlock.ql
