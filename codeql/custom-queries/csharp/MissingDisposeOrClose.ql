@@ -14,52 +14,44 @@ import csharp
 /**
  * Checks if a type implements IDisposable
  */
-predicate implementsIDisposable(Type t) {
+predicate implementsIDisposable(ValueOrRefType t) {
   t.getABaseType*().hasQualifiedName("System", "IDisposable")
 }
 
 /**
- * Checks if a type has Close method (common for streams, connections, etc.)
+ * Checks if a type is a common resource type that should be disposed
  */
-predicate hasCloseMethod(Type t) {
-  exists(Method m |
-    m.getDeclaringType() = t and
-    m.getName() = "Close" and
-    m.getNumberOfParameters() = 0
+predicate isCommonResourceType(ValueOrRefType t) {
+  t.hasQualifiedName("System.IO", ["FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter"]) or
+  t.hasQualifiedName("System.Net.Sockets", ["Socket", "TcpClient", "UdpClient"]) or
+  t.hasQualifiedName("System.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
+  t.hasQualifiedName("Microsoft.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
+  t.hasQualifiedName("System.Data", ["IDbConnection", "IDbCommand", "IDataReader"])
+}
+
+/**
+ * Checks if a type should be disposed
+ */
+predicate isResourceType(Type t) {
+  exists(ValueOrRefType vt | vt = t |
+    implementsIDisposable(vt) or
+    isCommonResourceType(vt)
   )
 }
 
 /**
- * Checks if a type is a resource that should be disposed/closed
+ * Checks if a local variable is used in a using statement
  */
-predicate isResourceType(Type t) {
-  implementsIDisposable(t) or
-  hasCloseMethod(t) or
-  // Common resource types that should be disposed
-  t.hasQualifiedName("System.IO", ["FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter"]) or
-  t.hasQualifiedName("System.Net.Sockets", ["Socket", "TcpClient", "UdpClient"]) or
-  // SQL Client packages (legacy first, then modern for compatibility)
-  t.hasQualifiedName("System.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
-  t.hasQualifiedName("Microsoft.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
-  t.hasQualifiedName("System.Data", ["IDbConnection", "IDbCommand", "IDataReader"]) or
-  // Generic pattern matching for common resource types
-  t.getName().matches(["%Connection", "%Reader", "%Writer", "%Stream"])
-}
-
-/**
- * Checks if a variable is used in a using statement
- */
-predicate isInUsingStatement(Variable v) {
+predicate isInUsingStatement(LocalVariable v) {
   exists(UsingStmt using |
-    using.getAVariableDeclExpr().getVariable() = v or
-    using.getExpr().(VariableAccess).getTarget() = v
+    using.getAVariableDeclExpr().getVariable() = v
   )
 }
 
 /**
  * Checks if Dispose is called on a variable
  */
-predicate hasDisposeCall(Variable v) {
+predicate hasDisposeCall(LocalVariable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Dispose"
@@ -69,7 +61,7 @@ predicate hasDisposeCall(Variable v) {
 /**
  * Checks if Close is called on a variable
  */
-predicate hasCloseCall(Variable v) {
+predicate hasCloseCall(LocalVariable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Close"
@@ -77,18 +69,18 @@ predicate hasCloseCall(Variable v) {
 }
 
 /**
- * Checks if the variable is returned from the method (caller responsibility)
+ * Checks if the variable is returned from the method
  */
-predicate isReturned(Variable v) {
+predicate isReturned(LocalVariable v) {
   exists(ReturnStmt ret |
     ret.getExpr().(VariableAccess).getTarget() = v
   )
 }
 
 /**
- * Checks if the variable is assigned to a field (may be disposed elsewhere)
+ * Checks if the variable is assigned to a field
  */
-predicate isAssignedToField(Variable v) {
+predicate isAssignedToField(LocalVariable v) {
   exists(AssignExpr assign |
     assign.getRValue().(VariableAccess).getTarget() = v and
     assign.getLValue() instanceof FieldAccess
@@ -96,15 +88,15 @@ predicate isAssignedToField(Variable v) {
 }
 
 /**
- * Checks if the variable is passed to another method that might dispose it
+ * Checks if the variable is passed to another method
  */
-predicate isPassedToMethod(Variable v) {
+predicate isPassedToMethod(LocalVariable v) {
   exists(MethodCall call |
     call.getAnArgument().(VariableAccess).getTarget() = v
   )
 }
 
-from VariableDeclExpr decl, Variable v
+from LocalVariableDeclExpr decl, LocalVariable v
 where
   v = decl.getVariable() and
   isResourceType(v.getType()) and
