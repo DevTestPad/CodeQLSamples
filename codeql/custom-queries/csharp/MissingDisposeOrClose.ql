@@ -12,37 +12,28 @@
 import csharp
 
 /**
- * Checks if a type implements IDisposable
+ * Checks if a type name indicates it's a resource that should be disposed
  */
-predicate implementsIDisposable(ValueOrRefType t) {
-  t.getABaseType*().hasQualifiedName("System", "IDisposable")
+predicate isResourceTypeName(string typeName) {
+  typeName.matches([
+    "FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter",
+    "SqlConnection", "SqlCommand", "SqlDataReader", 
+    "Socket", "TcpClient", "UdpClient",
+    "%Stream", "%Reader", "%Writer", "%Connection"
+  ])
 }
 
 /**
- * Checks if a type is a common resource type that should be disposed
+ * Checks if a variable declaration is for a resource type
  */
-predicate isCommonResourceType(ValueOrRefType t) {
-  t.hasQualifiedName("System.IO", ["FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter"]) or
-  t.hasQualifiedName("System.Net.Sockets", ["Socket", "TcpClient", "UdpClient"]) or
-  t.hasQualifiedName("System.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
-  t.hasQualifiedName("Microsoft.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
-  t.hasQualifiedName("System.Data", ["IDbConnection", "IDbCommand", "IDataReader"])
+predicate isResourceVariable(VariableDeclarationExpr var) {
+  isResourceTypeName(var.getVariable().getType().getName())
 }
 
 /**
- * Checks if a type should be disposed
+ * Checks if a variable is used in a using statement
  */
-predicate isResourceType(Type t) {
-  exists(ValueOrRefType vt | vt = t |
-    implementsIDisposable(vt) or
-    isCommonResourceType(vt)
-  )
-}
-
-/**
- * Checks if a local variable is used in a using statement
- */
-predicate isInUsingStatement(LocalVariable v) {
+predicate isInUsingStatement(Variable v) {
   exists(UsingStmt using |
     using.getAVariableDeclExpr().getVariable() = v
   )
@@ -51,7 +42,7 @@ predicate isInUsingStatement(LocalVariable v) {
 /**
  * Checks if Dispose is called on a variable
  */
-predicate hasDisposeCall(LocalVariable v) {
+predicate hasDisposeCall(Variable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Dispose"
@@ -61,7 +52,7 @@ predicate hasDisposeCall(LocalVariable v) {
 /**
  * Checks if Close is called on a variable
  */
-predicate hasCloseCall(LocalVariable v) {
+predicate hasCloseCall(Variable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Close"
@@ -71,7 +62,7 @@ predicate hasCloseCall(LocalVariable v) {
 /**
  * Checks if the variable is returned from the method
  */
-predicate isReturned(LocalVariable v) {
+predicate isReturned(Variable v) {
   exists(ReturnStmt ret |
     ret.getExpr().(VariableAccess).getTarget() = v
   )
@@ -80,26 +71,17 @@ predicate isReturned(LocalVariable v) {
 /**
  * Checks if the variable is assigned to a field
  */
-predicate isAssignedToField(LocalVariable v) {
+predicate isAssignedToField(Variable v) {
   exists(AssignExpr assign |
     assign.getRValue().(VariableAccess).getTarget() = v and
     assign.getLValue() instanceof FieldAccess
   )
 }
 
-/**
- * Checks if the variable is passed to another method
- */
-predicate isPassedToMethod(LocalVariable v) {
-  exists(MethodCall call |
-    call.getAnArgument().(VariableAccess).getTarget() = v
-  )
-}
-
-from LocalVariableDeclExpr decl, LocalVariable v
+from VariableDeclarationExpr decl, Variable v
 where
   v = decl.getVariable() and
-  isResourceType(v.getType()) and
+  isResourceVariable(decl) and
   // Variable is not properly managed
   not isInUsingStatement(v) and
   not hasDisposeCall(v) and
@@ -107,10 +89,8 @@ where
   // Exclude cases where resource management responsibility might be elsewhere
   not isReturned(v) and
   not isAssignedToField(v) and
-  not isPassedToMethod(v) and
-  // Exclude variables that are null or uninitialized
-  exists(decl.getInit()) and
-  not decl.getInit() instanceof NullLiteral
+  // Only flag variables that are actually initialized (not just declared)
+  exists(decl.getInitializer())
 select decl, 
   "Resource of type '" + v.getType().getName() + "' should be disposed. " +
   "Consider using a 'using' statement or explicitly calling Dispose()."
