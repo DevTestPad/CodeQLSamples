@@ -1,0 +1,4 @@
+name: custom-queries/csharp
+version: 1.0.0
+dependencies:
+  codeql/csharp-all: "*"
