@@ -1,0 +1,2 @@
+- include: codeql-suites/csharp-code-scanning.qls   # Standard security queries
+- query: codeql/custom-queries/csharp/BadCatchBlock.ql  # Your custom query
