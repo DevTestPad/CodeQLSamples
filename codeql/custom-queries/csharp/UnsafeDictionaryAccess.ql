@@ -10,100 +10,83 @@
 import csharp
 
 /**
- * Checks if a type is Dictionary<TKey,TValue>
+ * Checks if a method call is on a Dictionary type using simple name matching
  */
-predicate isDictionaryType(Type t) {
-  t.getName().matches("Dictionary%") and
-  t.getNamespace().getName() = "System.Collections.Generic"
-  or
-  exists(TypeAccess ta |
-    ta.getTarget().getName().matches("Dictionary%") and
-    ta.toString().matches("%Dictionary<%")
+predicate isDictionaryCall(MethodCall call) {
+  exists(string typeName |
+    typeName = call.getQualifier().getType().getName() and
+    typeName.matches("Dictionary%") and
+    not typeName.matches("ConcurrentDictionary%")
   )
 }
 
 /**
- * Checks if a method call is a Dictionary mutating operation
+ * Checks if a method call is a Dictionary operation that could be unsafe
  */
-predicate isDictionaryMutatingCall(MethodCall call) {
-  call.getTarget().getName() in [
-    "Add", "Remove", "Clear", "set_Item", 
-    "TryAdd", "TryRemove", "TryUpdate"
-  ] and
-  isDictionaryType(call.getQualifier().getType())
-}
-
-/**
- * Checks if a method call is a Dictionary read operation
- */
-predicate isDictionaryReadCall(MethodCall call) {
-  call.getTarget().getName() in [
+predicate isDictionaryOperation(MethodCall call) {
+  isDictionaryCall(call) and
+  call.getTarget().getName().matches([
+    "Add", "Remove", "Clear", "set_Item", "get_Item",
     "ContainsKey", "ContainsValue", "TryGetValue", 
-    "get_Item", "get_Count", "get_Keys", "get_Values"
-  ] and
-  isDictionaryType(call.getQualifier().getType())
+    "TryAdd", "TryRemove", "TryUpdate"
+  ])
 }
 
 /**
- * Checks if a statement is within a lock block
+ * Checks if a statement is within a lock statement using simple parent checking
  */
 predicate isWithinLock(Stmt stmt) {
-  exists(LockStmt lock | stmt.getParent*() = lock.getBody())
+  exists(LockStmt lock | stmt.getParent*() = lock)
 }
 
 /**
- * Checks if a method has threading-related attributes or keywords
+ * Checks if a method has threading-related keywords in its name
  */
-predicate hasThreadingIndicators(Method m) {
+predicate hasThreadingKeywords(Method m) {
   m.getName().toLowerCase().matches([
-    "%thread%", "%async%", "%concurrent%", "%parallel%", "%task%"
+    "%thread%", "%async%", "%task%", "%parallel%", "%concurrent%"
   ])
-  or
-  exists(Attribute attr |
-    attr.getTarget() = m and
-    attr.getType().getName().matches([
-      "%Thread%", "%Async%", "%Task%", "%Concurrent%"
-    ])
-  )
 }
 
 /**
- * Checks if a class has static Dictionary fields (often shared across threads)
+ * Checks if there's evidence of multi-threading by looking for Task.Run, Thread.Start, etc.
  */
-predicate isStaticDictionaryField(Field f) {
-  f.isStatic() and
-  isDictionaryType(f.getType())
-}
-
-/**
- * Checks if there's evidence of multi-threading in the same class
- */
-predicate hasMultiThreadingEvidence(RefType container) {
-  exists(Method m | m.getDeclaringType() = container and hasThreadingIndicators(m))
-  or
-  exists(Field f | f.getDeclaringType() = container and isStaticDictionaryField(f))
-  or
+predicate hasThreadingCalls(RefType container) {
   exists(MethodCall call |
     call.getEnclosingCallable().getDeclaringType() = container and
     (
-      call.getTarget().getName().matches([
-        "Start", "Run", "StartNew", "ContinueWith"
-      ]) and
-      call.getTarget().getDeclaringType().getName().matches([
-        "Thread", "Task", "ThreadPool"
-      ])
+      call.getTarget().getName().matches(["Run", "Start", "StartNew"]) or
+      call.toString().toLowerCase().matches(["%task.run%", "%thread.start%", "%threadpool%"])
     )
   )
 }
 
+/**
+ * Checks if the container class has static fields that look like shared dictionaries
+ */
+predicate hasStaticDictionaryFields(RefType container) {
+  exists(Field f |
+    f.getDeclaringType() = container and
+    f.isStatic() and
+    f.getType().getName().matches("Dictionary%")
+  )
+}
+
+/**
+ * Determines if there's evidence of multi-threading in the class
+ */
+predicate hasMultiThreadingEvidence(RefType container) {
+  exists(Method m | m.getDeclaringType() = container and hasThreadingKeywords(m)) or
+  hasThreadingCalls(container) or
+  hasStaticDictionaryFields(container)
+}
+
 from MethodCall dictCall, RefType containerClass
 where
-  (isDictionaryMutatingCall(dictCall) or isDictionaryReadCall(dictCall)) and
+  isDictionaryOperation(dictCall) and
   containerClass = dictCall.getEnclosingCallable().getDeclaringType() and
   hasMultiThreadingEvidence(containerClass) and
-  not isWithinLock(dictCall) and
-  // Exclude if using ConcurrentDictionary instead
-  not dictCall.getTarget().getDeclaringType().getName().matches("ConcurrentDictionary%")
+  not isWithinLock(dictCall)
 select dictCall, 
   "Dictionary access in multi-threaded context without proper locking. " +
   "Consider using lock statements or ConcurrentDictionary<TKey,TValue> for thread safety."
