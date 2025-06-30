@@ -33,10 +33,10 @@ predicate isDictionaryOperation(MethodCall call) {
 }
 
 /**
- * Checks if a statement is within a lock statement using simple parent checking
+ * Checks if a method call is within a lock statement
  */
-predicate isWithinLock(Stmt stmt) {
-  exists(LockStmt lock | stmt.getParent*() = lock)
+predicate isCallWithinLock(MethodCall call) {
+  exists(LockStmt lock | call.getParent*() = lock)
 }
 
 /**
@@ -86,7 +86,7 @@ where
   isDictionaryOperation(dictCall) and
   containerClass = dictCall.getEnclosingCallable().getDeclaringType() and
   hasMultiThreadingEvidence(containerClass) and
-  not isWithinLock(dictCall)
+  not isCallWithinLock(dictCall)
 select dictCall, 
   "Dictionary access in multi-threaded context without proper locking. " +
   "Consider using lock statements or ConcurrentDictionary<TKey,TValue> for thread safety."
