@@ -50,7 +50,7 @@ predicate isCallWithinThreadingContext(MethodCall dictCall) {
 }
 
 /**
- * Checks if the dictionary being accessed is a static field (likely shared)
+ * Checks if the dictionary being accessed is a static field (not local variable)
  */
 predicate isStaticDictionaryAccess(MethodCall call) {
   exists(FieldAccess fa |
@@ -61,7 +61,7 @@ predicate isStaticDictionaryAccess(MethodCall call) {
 }
 
 /**
- * Checks if a method has async/threading keywords
+ * Checks if a method has async/threading keywords in its name
  */
 predicate isThreadingMethod(Method m) {
   m.getName().toLowerCase().matches([
@@ -73,11 +73,15 @@ from MethodCall dictCall
 where
   isDictionaryOperation(dictCall) and
   (
-    // Dictionary access within Task.Run, Thread.Start, etc.
+    // ONLY flag if one of these specific conditions is met:
+    
+    // 1. Dictionary access within Task.Run, Thread.Start, etc.
     isCallWithinThreadingContext(dictCall) or
-    // Access to static dictionary fields (likely shared across threads)
+    
+    // 2. Access to static dictionary fields (shared across threads)
     isStaticDictionaryAccess(dictCall) or
-    // Dictionary access in methods with threading keywords
+    
+    // 3. Dictionary access in methods with threading keywords
     isThreadingMethod(dictCall.getEnclosingCallable())
   ) and
   // Not protected by locking
