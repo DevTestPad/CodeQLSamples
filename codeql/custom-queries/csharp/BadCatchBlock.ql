@@ -1,8 +1,8 @@
 /**
- * @name Empty or trivial catch block
- * @description Finds catch blocks that are empty or contain only trivial statements without proper error handling
+ * @name Generic exception catch without using exception details
+ * @description Finds catch blocks that catch generic exceptions but don't use the exception information
  * @kind problem
- * @id cs/empty-catch-block
+ * @id cs/generic-exception-without-details
  * @tags maintainability
  * @severity warning
  */
@@ -23,48 +23,65 @@ predicate hasLoggingCall(Stmt stmt) {
 }
 
 /**
- * Checks if a logging call uses any variables (likely the exception variable)
- */
-predicate hasVariableInLogging(Stmt stmt) {
-  exists(MethodCall call, VariableAccess va |
-    call.getParent*() = stmt and
-    call.getTarget().getName().toLowerCase().matches([
-      "%log%", "%write%", "%debug%", "%info%", "%warn%", "%error%", 
-      "%fatal%", "%trace%", "%print%"
-    ]) and
-    va.getParent*() = call
-  )
-}
-
-/**
  * Checks if the catch block contains a throw statement
  */
 predicate hasThrowStatement(CatchClause catch) {
   exists(ThrowStmt throw | throw.getParent*() = catch.getBlock())
 }
 
+/**
+ * Checks if the catch block uses any variable that was declared in the catch parameter
+ * We look for variables named typically like exception parameters (ex, e, exception, etc.)
+ */
+predicate usesLikelyExceptionVariable(CatchClause catch) {
+  exists(VariableAccess va |
+    va.getParent*() = catch.getBlock() and
+    va.getTarget().getName().toLowerCase().matches(["ex", "e", "exception", "error", "err"])
+  )
+}
+
+/**
+ * Checks if this looks like a generic exception catch by examining the catch clause text
+ * This is a heuristic approach since we can't easily get the exact type
+ */
+predicate looksLikeGenericException(CatchClause catch) {
+  // Look for patterns in the source text that suggest generic exception handling
+  exists(string catchText |
+    catchText = catch.toString().toLowerCase() and
+    (
+      catchText.matches("%catch%exception%") and
+      not catchText.matches("%argumentexception%") and
+      not catchText.matches("%invalidoperationexception%") and
+      not catchText.matches("%nullreferenceexception%") and
+      not catchText.matches("%notimplementedexception%") and
+      not catchText.matches("%unauthorizedaccessexception%") and
+      not catchText.matches("%filenotfoundexception%") and
+      not catchText.matches("%directorynotfoundexception%") and
+      not catchText.matches("%timeoutexception%")
+    )
+  )
+  or
+  // Catch-all without specifying type
+  catch.toString().matches("%catch%(%")
+}
+
 from CatchClause catch
 where
-  // Focus on problematic catch blocks
+  // Focus on generic exception catches
+  looksLikeGenericException(catch)
+  and
+  // That don't properly handle the exception
   (
-    // Completely empty catch block
+    // Empty catch block
     catch.getBlock().getNumberOfStmts() = 0
     or
-    // Small catch block without proper logging or rethrowing
+    // Non-empty but doesn't use exception details and doesn't rethrow
     (
-      catch.getBlock().getNumberOfStmts() <= 2 and
-      not hasLoggingCall(catch.getBlock()) and
-      not hasThrowStatement(catch)
-    )
-    or
-    // Catch block with logging but no variables (generic messages only)
-    (
-      catch.getBlock().getNumberOfStmts() <= 3 and
-      hasLoggingCall(catch.getBlock()) and
-      not hasVariableInLogging(catch.getBlock()) and
+      catch.getBlock().getNumberOfStmts() > 0 and
+      not usesLikelyExceptionVariable(catch) and
       not hasThrowStatement(catch)
     )
   )
 select catch, 
-  "This catch block is empty or doesn't properly handle exceptions. " +
-  "Consider logging the actual exception details or rethrowing the exception."
+  "This catch block catches generic exceptions but doesn't use the exception details or rethrow. " +
+  "Consider logging the actual exception information or catching more specific exception types."
