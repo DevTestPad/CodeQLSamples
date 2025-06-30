@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 
 namespace HelloWorld
 {
@@ -23,7 +24,21 @@ namespace HelloWorld
                 // This swallows all exceptions without logging, rethrowing, or handling properly
                 // The exception is completely hidden from the caller
             }
-            
+
+            // Another scenario where we write a debug message but don't do anything else
+            try
+            {
+                // This will throw a first chance exception
+                DangerousOperation();
+            }
+            catch (Exception)
+            {
+                // BAD PRACTICE: Generic exception handler that hides the error
+                // This swallows all exceptions without logging, rethrowing, or handling properly
+                // The exception is completely hidden from the caller
+                Debug.WriteLine("An error occurred, but we won't do anything about it.");
+            }
+
             Console.WriteLine("Operation completed (but we don't know if it actually succeeded!)");
         }
         
