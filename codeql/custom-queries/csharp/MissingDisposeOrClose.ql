@@ -12,37 +12,33 @@
 import csharp
 
 /**
- * Checks if a type name indicates it's a resource that should be disposed
+ * Checks if a method call creates a resource that should be disposed
  */
-predicate isResourceTypeName(string typeName) {
-  typeName.matches([
-    "FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter",
-    "SqlConnection", "SqlCommand", "SqlDataReader", 
-    "Socket", "TcpClient", "UdpClient",
-    "%Stream", "%Reader", "%Writer", "%Connection"
-  ])
-}
-
-/**
- * Checks if a variable declaration is for a resource type
- */
-predicate isResourceVariable(VariableDeclarationExpr var) {
-  isResourceTypeName(var.getVariable().getType().getName())
-}
-
-/**
- * Checks if a variable is used in a using statement
- */
-predicate isInUsingStatement(Variable v) {
-  exists(UsingStmt using |
-    using.getAVariableDeclExpr().getVariable() = v
+predicate isResourceCreation(MethodCall call) {
+  exists(string typeName |
+    typeName = call.getTarget().getDeclaringType().getName() and
+    typeName.matches([
+      "FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter",
+      "SqlConnection", "SqlCommand", "SqlDataReader", 
+      "Socket", "TcpClient", "UdpClient"
+    ]) and
+    call.getTarget().getName().matches(["FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter", "SqlConnection", "SqlCommand", "Socket", "TcpClient", "UdpClient"])
   )
 }
 
 /**
- * Checks if Dispose is called on a variable
+ * Checks if a variable access is within a using statement
  */
-predicate hasDisposeCall(Variable v) {
+predicate isVariableInUsing(VariableAccess va) {
+  exists(UsingStmt using |
+    va.getParent*() = using
+  )
+}
+
+/**
+ * Checks if Dispose is called on the same variable
+ */
+predicate hasDisposeOnVariable(Variable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Dispose"
@@ -50,9 +46,9 @@ predicate hasDisposeCall(Variable v) {
 }
 
 /**
- * Checks if Close is called on a variable
+ * Checks if Close is called on the same variable
  */
-predicate hasCloseCall(Variable v) {
+predicate hasCloseOnVariable(Variable v) {
   exists(MethodCall call |
     call.getQualifier().(VariableAccess).getTarget() = v and
     call.getTarget().getName() = "Close"
@@ -60,37 +56,34 @@ predicate hasCloseCall(Variable v) {
 }
 
 /**
- * Checks if the variable is returned from the method
+ * Checks if variable is returned
  */
-predicate isReturned(Variable v) {
+predicate isVariableReturned(Variable v) {
   exists(ReturnStmt ret |
     ret.getExpr().(VariableAccess).getTarget() = v
   )
 }
 
-/**
- * Checks if the variable is assigned to a field
- */
-predicate isAssignedToField(Variable v) {
-  exists(AssignExpr assign |
-    assign.getRValue().(VariableAccess).getTarget() = v and
-    assign.getLValue() instanceof FieldAccess
-  )
-}
-
-from VariableDeclarationExpr decl, Variable v
+from LocalVariableDeclStmt declStmt, Variable v
 where
-  v = decl.getVariable() and
-  isResourceVariable(decl) and
+  exists(MethodCall resourceCall |
+    // Variable is assigned a resource creation call
+    declStmt.getAVariableDeclExpr().getVariable() = v and
+    declStmt.getAVariableDeclExpr().getInitializer() = resourceCall and
+    exists(string typeName |
+      typeName = resourceCall.getType().getName() and
+      typeName.matches([
+        "FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter",
+        "SqlConnection", "SqlCommand", "SqlDataReader", 
+        "Socket", "TcpClient", "UdpClient"
+      ])
+    )
+  ) and
   // Variable is not properly managed
-  not isInUsingStatement(v) and
-  not hasDisposeCall(v) and
-  not hasCloseCall(v) and
-  // Exclude cases where resource management responsibility might be elsewhere
-  not isReturned(v) and
-  not isAssignedToField(v) and
-  // Only flag variables that are actually initialized (not just declared)
-  exists(decl.getInitializer())
-select decl, 
+  not isVariableInUsing(declStmt.getAVariableDeclExpr()) and
+  not hasDisposeOnVariable(v) and
+  not hasCloseOnVariable(v) and
+  not isVariableReturned(v)
+select declStmt, 
   "Resource of type '" + v.getType().getName() + "' should be disposed. " +
   "Consider using a 'using' statement or explicitly calling Dispose()."
