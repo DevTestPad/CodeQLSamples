@@ -1,1 +1,2 @@
 - query: BadCatchBlock.ql
+- query: UnsafeDictionaryAccess.ql

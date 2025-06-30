@@ -17,6 +17,19 @@ namespace HelloWorld
             
             Console.WriteLine();
             
+            // Demonstrate unsafe dictionary usage
+            Console.WriteLine("=== Dictionary Thread Safety Demo ===");
+            var dictExample = new UnsafeDictionaryExamples();
+            
+            // This will trigger our CodeQL rule
+            dictExample.UnsafeMultiThreadedAccess();
+            
+            // This shows the safe alternative
+            dictExample.SafeLockedDictionaryAccess();
+            dictExample.SafeConcurrentDictionaryUsage();
+            
+            Console.WriteLine();
+            
             // Show what good exception handling looks like for comparison
             Console.WriteLine("=== Good Exception Handling Demo ===");
             try
