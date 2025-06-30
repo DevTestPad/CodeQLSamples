@@ -23,7 +23,7 @@ predicate implementsIDisposable(Type t) {
  */
 predicate hasCloseMethod(Type t) {
   exists(Method m |
-    m = t.getAMethod() and
+    m.getDeclaringType() = t and
     m.getName() = "Close" and
     m.getNumberOfParameters() = 0
   )
@@ -38,10 +38,11 @@ predicate isResourceType(Type t) {
   // Common resource types that should be disposed
   t.hasQualifiedName("System.IO", ["FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter"]) or
   t.hasQualifiedName("System.Net.Sockets", ["Socket", "TcpClient", "UdpClient"]) or
-  // Support both legacy and modern SqlClient packages
+  // SQL Client packages (legacy first, then modern for compatibility)
   t.hasQualifiedName("System.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
   t.hasQualifiedName("Microsoft.Data.SqlClient", ["SqlConnection", "SqlCommand", "SqlDataReader"]) or
   t.hasQualifiedName("System.Data", ["IDbConnection", "IDbCommand", "IDataReader"]) or
+  // Generic pattern matching for common resource types
   t.getName().matches(["%Connection", "%Reader", "%Writer", "%Stream"])
 }
 
@@ -50,7 +51,7 @@ predicate isResourceType(Type t) {
  */
 predicate isInUsingStatement(Variable v) {
   exists(UsingStmt using |
-    using.getVariableDeclExpr().getVariable() = v or
+    using.getAVariableDeclExpr().getVariable() = v or
     using.getExpr().(VariableAccess).getTarget() = v
   )
 }
@@ -103,10 +104,7 @@ predicate isPassedToMethod(Variable v) {
   )
 }
 
-/**
- * Main query logic
- */
-from LocalVariableDecl decl, Variable v
+from VariableDeclExpr decl, Variable v
 where
   v = decl.getVariable() and
   isResourceType(v.getType()) and
