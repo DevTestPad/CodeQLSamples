@@ -47,8 +47,8 @@ namespace HelloWorld
                 // BAD: Dictionary operations without locking in async context
                 _instanceDict.Add(1, "value1");
                 _instanceDict[2] = "value2";
-                
-                if (_instanceDict.TryGetValue(1, out string result))
+
+                if (_instanceDict.TryGetValue(1, out string? result) && result != null)
                 {
                     Console.WriteLine(result);
                 }
