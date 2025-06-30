@@ -1,8 +1,8 @@
 /**
- * @name Empty or poor generic exception handler
- * @description Finds catch blocks that catch generic exceptions without proper handling
+ * @name Empty or trivial catch block
+ * @description Finds catch blocks that are empty or contain only trivial statements without proper error handling
  * @kind problem
- * @id cs/poor-generic-exception-handler
+ * @id cs/empty-catch-block
  * @tags maintainability
  * @severity warning
  */
@@ -29,26 +29,9 @@ predicate hasThrowStatement(CatchClause catch) {
   exists(ThrowStmt throw | throw.getParent*() = catch.getBlock())
 }
 
-/**
- * Simple check for generic exception catches by looking at the variable type name
- */
-predicate looksLikeGenericException(CatchClause catch) {
-  // Check if the catch clause text contains "Exception" but not specific exception types
-  exists(string varType |
-    varType = catch.getVariable().getType().getName() and
-    varType = "Exception"
-  )
-  or
-  // Catch with no variable (catch everything)
-  not exists(catch.getVariable())
-}
-
 from CatchClause catch
 where
-  // Look for generic exception patterns
-  looksLikeGenericException(catch)
-  and
-  // Empty or problematic handling
+  // Focus on problematic catch blocks
   (
     // Completely empty catch block
     catch.getBlock().getNumberOfStmts() = 0
@@ -61,5 +44,5 @@ where
     )
   )
 select catch, 
-  "This catch block catches generic exceptions but doesn't properly log or rethrow. " +
-  "Consider logging the exception details or catching more specific exception types."
+  "This catch block is empty or doesn't properly handle exceptions. " +
+  "Consider logging the exception details or rethrowing the exception."
