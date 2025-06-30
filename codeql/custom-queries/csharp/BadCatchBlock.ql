@@ -23,6 +23,20 @@ predicate hasLoggingCall(Stmt stmt) {
 }
 
 /**
+ * Checks if a logging call uses any variables (likely the exception variable)
+ */
+predicate hasVariableInLogging(Stmt stmt) {
+  exists(MethodCall call, VariableAccess va |
+    call.getParent*() = stmt and
+    call.getTarget().getName().toLowerCase().matches([
+      "%log%", "%write%", "%debug%", "%info%", "%warn%", "%error%", 
+      "%fatal%", "%trace%", "%print%"
+    ]) and
+    va.getParent*() = call
+  )
+}
+
+/**
  * Checks if the catch block contains a throw statement
  */
 predicate hasThrowStatement(CatchClause catch) {
@@ -42,7 +56,15 @@ where
       not hasLoggingCall(catch.getBlock()) and
       not hasThrowStatement(catch)
     )
+    or
+    // Catch block with logging but no variables (generic messages only)
+    (
+      catch.getBlock().getNumberOfStmts() <= 3 and
+      hasLoggingCall(catch.getBlock()) and
+      not hasVariableInLogging(catch.getBlock()) and
+      not hasThrowStatement(catch)
+    )
   )
 select catch, 
   "This catch block is empty or doesn't properly handle exceptions. " +
-  "Consider logging the exception details or rethrowing the exception."
+  "Consider logging the actual exception details or rethrowing the exception."
