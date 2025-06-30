@@ -1,6 +1,6 @@
 /**
- * @name Empty catch block that swallows exceptions
- * @description Finds catch blocks that are empty or contain only trivial statements
+ * @name Empty or trivial catch block
+ * @description Finds catch blocks that are empty or contain only trivial statements without proper error handling
  * @kind problem
  * @id cs/empty-catch-block
  * @tags maintainability
@@ -9,14 +9,40 @@
 
 import csharp
 
+/**
+ * Checks if a statement contains any method calls that look like logging
+ */
+predicate hasLoggingCall(Stmt stmt) {
+  exists(MethodCall call |
+    call.getParent*() = stmt and
+    call.getTarget().getName().toLowerCase().matches([
+      "%log%", "%write%", "%debug%", "%info%", "%warn%", "%error%", 
+      "%fatal%", "%trace%", "%print%"
+    ])
+  )
+}
+
+/**
+ * Checks if the catch block contains a throw statement
+ */
+predicate hasThrowStatement(CatchClause catch) {
+  exists(ThrowStmt throw | throw.getParent*() = catch.getBlock())
+}
+
 from CatchClause catch
 where
-  // Empty catch block
-  catch.getBlock().getNumberOfStmts() = 0
-  or
-  // Catch block with only a single simple statement that's not a throw
+  // Focus on problematic catch blocks
   (
-    catch.getBlock().getNumberOfStmts() = 1 and
-    not exists(ThrowStmt throw | throw.getParent() = catch.getBlock())
+    // Completely empty catch block
+    catch.getBlock().getNumberOfStmts() = 0
+    or
+    // Small catch block without proper logging or rethrowing
+    (
+      catch.getBlock().getNumberOfStmts() <= 2 and
+      not hasLoggingCall(catch.getBlock()) and
+      not hasThrowStatement(catch)
+    )
   )
-select catch, "This catch block is empty or trivial and swallows exceptions without proper handling."
+select catch, 
+  "This catch block is empty or doesn't properly handle exceptions. " +
+  "Consider logging the exception details or rethrowing the exception."
