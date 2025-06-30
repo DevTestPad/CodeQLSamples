@@ -1,2 +1,3 @@
-- include: codeql-suites/csharp-code-scanning.qls
+- include:
+    - codeql-suites/csharp-code-scanning.qls
 - query: codeql/custom-queries/csharp/BadCatchBlock.ql
