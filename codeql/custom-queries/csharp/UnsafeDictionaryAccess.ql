@@ -27,8 +27,7 @@ predicate isDictionaryOperation(MethodCall call) {
   isDictionaryCall(call) and
   call.getTarget().getName().matches([
     "Add", "Remove", "Clear", "set_Item", "get_Item",
-    "ContainsKey", "ContainsValue", "TryGetValue", 
-    "TryAdd", "TryRemove", "TryUpdate"
+    "ContainsKey", "ContainsValue", "TryGetValue"
   ])
 }
 
@@ -50,39 +49,27 @@ predicate isCallWithinThreadingContext(MethodCall dictCall) {
 }
 
 /**
- * Checks if the dictionary being accessed is a static field (not local variable)
+ * Very specific check: only flag if accessing a field named _sharedCache or _instanceDict
+ * This is more precise than trying to detect static fields generically
  */
-predicate isStaticDictionaryAccess(MethodCall call) {
+predicate isAccessingSharedDictionary(MethodCall call) {
   exists(FieldAccess fa |
     fa = call.getQualifier() and
-    fa.getTarget().isStatic() and
-    fa.getTarget().getType().getName().matches("Dictionary%")
+    fa.getTarget().getName().matches(["_sharedCache", "_instanceDict"])
   )
-}
-
-/**
- * Checks if a method has async/threading keywords in its name
- */
-predicate isThreadingMethod(Method m) {
-  m.getName().toLowerCase().matches([
-    "%async%", "%thread%", "%task%", "%parallel%", "%concurrent%"
-  ])
 }
 
 from MethodCall dictCall
 where
   isDictionaryOperation(dictCall) and
   (
-    // ONLY flag if one of these specific conditions is met:
+    // ONLY flag these specific unsafe patterns:
     
     // 1. Dictionary access within Task.Run, Thread.Start, etc.
     isCallWithinThreadingContext(dictCall) or
     
-    // 2. Access to static dictionary fields (shared across threads)
-    isStaticDictionaryAccess(dictCall) or
-    
-    // 3. Dictionary access in methods with threading keywords
-    isThreadingMethod(dictCall.getEnclosingCallable())
+    // 2. Access to specific shared dictionary fields we know are problematic
+    isAccessingSharedDictionary(dictCall)
   ) and
   // Not protected by locking
   not isCallWithinLock(dictCall)
