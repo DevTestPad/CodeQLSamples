@@ -1,0 +1,15 @@
+C:\temp\codeql\CodeQLSamples\bin\Debug\net8.0\HelloWorld.exe
+C:\temp\codeql\CodeQLSamples\bin\Debug\net8.0\HelloWorld.deps.json
+C:\temp\codeql\CodeQLSamples\bin\Debug\net8.0\HelloWorld.runtimeconfig.json
+C:\temp\codeql\CodeQLSamples\bin\Debug\net8.0\HelloWorld.dll
+C:\temp\codeql\CodeQLSamples\bin\Debug\net8.0\HelloWorld.pdb
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.GeneratedMSBuildEditorConfig.editorconfig
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.AssemblyInfoInputs.cache
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.AssemblyInfo.cs
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.csproj.CoreCompileInputs.cache
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.sourcelink.json
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.dll
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\refint\HelloWorld.dll
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.pdb
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\HelloWorld.genruntimeconfig.cache
+C:\temp\codeql\CodeQLSamples\obj\Debug\net8.0\ref\HelloWorld.dll
