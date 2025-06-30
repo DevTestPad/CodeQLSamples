@@ -23,18 +23,16 @@ predicate hasLoggingCall(Stmt stmt) {
 }
 
 /**
- * Checks if a logging call actually uses exception information
- * by looking for variable access in the arguments
+ * Checks if a logging call uses any variables (likely the exception variable)
  */
-predicate hasMeaningfulLogging(Stmt stmt) {
-  exists(MethodCall call |
+predicate hasVariableInLogging(Stmt stmt) {
+  exists(MethodCall call, VariableAccess va |
     call.getParent*() = stmt and
     call.getTarget().getName().toLowerCase().matches([
       "%log%", "%write%", "%debug%", "%info%", "%warn%", "%error%", 
       "%fatal%", "%trace%", "%print%"
     ]) and
-    // Check if any argument contains a variable access (likely the exception)
-    exists(VariableAccess va | va.getParent*() = call)
+    va.getParent*() = call
   )
 }
 
@@ -43,19 +41,6 @@ predicate hasMeaningfulLogging(Stmt stmt) {
  */
 predicate hasThrowStatement(CatchClause catch) {
   exists(ThrowStmt throw | throw.getParent*() = catch.getBlock())
-}
-
-/**
- * Checks if the catch block only contains assignment statements
- * (like: string error = ex.Message; which doesn't actually handle the error)
- */
-predicate hasOnlyTrivialAssignments(CatchClause catch) {
-  catch.getBlock().getNumberOfStmts() > 0 and
-  catch.getBlock().getNumberOfStmts() <= 2 and
-  forall(Stmt stmt | stmt.getParent() = catch.getBlock() |
-    stmt instanceof AssignExpr or 
-    stmt instanceof LocalVariableDeclStmt
-  )
 }
 
 from CatchClause catch
@@ -68,21 +53,18 @@ where
     // Small catch block without proper logging or rethrowing
     (
       catch.getBlock().getNumberOfStmts() <= 2 and
-      not hasMeaningfulLogging(catch.getBlock()) and
+      not hasLoggingCall(catch.getBlock()) and
       not hasThrowStatement(catch)
     )
     or
-    // Catch block with only trivial assignments
-    hasOnlyTrivialAssignments(catch)
-    or
-    // Catch block that has logging but it's just generic messages (no exception details)
+    // Catch block with logging but no variables (generic messages only)
     (
       catch.getBlock().getNumberOfStmts() <= 3 and
       hasLoggingCall(catch.getBlock()) and
-      not hasMeaningfulLogging(catch.getBlock()) and
+      not hasVariableInLogging(catch.getBlock()) and
       not hasThrowStatement(catch)
     )
   )
 select catch, 
-  "This catch block doesn't properly handle exceptions. " +
+  "This catch block is empty or doesn't properly handle exceptions. " +
   "Consider logging the actual exception details or rethrowing the exception."
