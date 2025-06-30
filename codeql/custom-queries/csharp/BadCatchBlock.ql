@@ -10,24 +10,29 @@
 import csharp
 
 /**
- * Checks if a statement or its descendants contain logging calls
+ * Checks if a statement contains logging calls using simple name matching
  */
 predicate hasLoggingCall(Stmt stmt) {
   exists(MethodCall call |
     call.getParent*() = stmt and
     (
-      // Common logging methods
+      // Check for common logging method names
       call.getTarget().getName().toLowerCase().matches([
         "%log%", "%write%", "%debug%", "%info%", "%warn%", "%error%", 
         "%fatal%", "%trace%", "%print%"
       ])
       or
-      // Console writes (basic logging)
-      call.getTarget().getDeclaringType().hasQualifiedName("System.Console")
+      // Check for Console class methods by name
+      (
+        call.getTarget().getDeclaringType().getName() = "Console" and
+        call.getTarget().getName().matches(["WriteLine", "Write"])
+      )
       or
-      // Debug/Trace writes
-      call.getTarget().getDeclaringType().hasQualifiedName("System.Diagnostics.Debug") or
-      call.getTarget().getDeclaringType().hasQualifiedName("System.Diagnostics.Trace")
+      // Check for Debug/Trace methods by name
+      (
+        call.getTarget().getDeclaringType().getName().matches(["Debug", "Trace"]) and
+        call.getTarget().getName().matches(["WriteLine", "Write"])
+      )
     )
   )
 }
@@ -40,17 +45,16 @@ predicate hasThrowStatement(CatchClause catch) {
 }
 
 /**
- * Checks if this is a generic Exception catch
+ * Checks if this is a generic Exception catch using simple name matching
  */
 predicate isGenericExceptionCatch(CatchClause catch) {
-  // Catches System.Exception specifically
-  catch.getCaughtExceptionType().hasQualifiedName("System.Exception")
+  exists(TypeAccess ta |
+    ta = catch.getCaughtExceptionType() and
+    ta.getTarget().getName() = "Exception"
+  )
   or
-  // Catches with no specific type (catches everything)
+  // Catch with no specific type
   not exists(catch.getCaughtExceptionType())
-  or
-  // Catches base Exception class
-  catch.getCaughtExceptionType().getName() = "Exception"
 }
 
 from CatchClause catch
@@ -71,5 +75,5 @@ where
     )
   )
 select catch, 
-  "This catch block catches generic exceptions but doesn't log the error or rethrow. " +
+  "This catch block catches generic 'Exception' but doesn't log the error or rethrow. " +
   "Consider logging the exception details or catching more specific exception types."
