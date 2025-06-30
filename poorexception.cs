@@ -39,6 +39,23 @@ namespace HelloWorld
                 Debug.WriteLine("An error occurred, but we won't do anything about it.");
             }
 
+            // Another scenario where we simple trap a generic exception and but still write the error out
+            try
+            {
+                // This will throw a first chance exception
+                DangerousOperation();
+            }
+            catch (Exception)
+            {
+                // BAD PRACTICE: Generic exception handler that hides the error
+                // This swallows all exceptions without logging, rethrowing, or handling properly
+                // The exception is completely hidden from the caller
+                string errorMessage = "An error occurred, but we won't do anything about it.";
+                Console.WriteLine($"Generic error: {errorMessage}");
+
+            }
+
+
             Console.WriteLine("Operation completed (but we don't know if it actually succeeded!)");
         }
         
