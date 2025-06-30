@@ -1,5 +1,10 @@
 # BadCatchBlock.ql
 
+References 
+•  For more information on .NET performance see, 'Improving .NET Application Performance and Scalability': http://msdn.microsoft.com/en
+us/library/ms998530.aspx  
+•  Why catch(Exception)/empty catch is bad: https://devblogs.microsoft.com/dotnet/why-catchexceptionempty-catch-is-bad/  
+
 **Query ID:** `cs/generic-exception-without-details`  
 **Severity:** Warning  
 **Category:** Maintainability
