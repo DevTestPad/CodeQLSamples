@@ -40,52 +40,47 @@ predicate isCallWithinLock(MethodCall call) {
 }
 
 /**
- * Checks if a method has threading-related keywords in its name
+ * Checks if a method call is within a Task.Run or similar threading construct
  */
-predicate hasThreadingKeywords(Method m) {
+predicate isCallWithinThreadingContext(MethodCall dictCall) {
+  exists(MethodCall threadCall |
+    threadCall.getTarget().getName().matches(["Run", "Start", "StartNew"]) and
+    dictCall.getParent*() = threadCall
+  )
+}
+
+/**
+ * Checks if the dictionary being accessed is a static field (likely shared)
+ */
+predicate isStaticDictionaryAccess(MethodCall call) {
+  exists(FieldAccess fa |
+    fa = call.getQualifier() and
+    fa.getTarget().isStatic() and
+    fa.getTarget().getType().getName().matches("Dictionary%")
+  )
+}
+
+/**
+ * Checks if a method has async/threading keywords
+ */
+predicate isThreadingMethod(Method m) {
   m.getName().toLowerCase().matches([
-    "%thread%", "%async%", "%task%", "%parallel%", "%concurrent%"
+    "%async%", "%thread%", "%task%", "%parallel%", "%concurrent%"
   ])
 }
 
-/**
- * Checks if there's evidence of multi-threading by looking for Task.Run, Thread.Start, etc.
- */
-predicate hasThreadingCalls(RefType container) {
-  exists(MethodCall call |
-    call.getEnclosingCallable().getDeclaringType() = container and
-    (
-      call.getTarget().getName().matches(["Run", "Start", "StartNew"]) or
-      call.toString().toLowerCase().matches(["%task.run%", "%thread.start%", "%threadpool%"])
-    )
-  )
-}
-
-/**
- * Checks if the container class has static fields that look like shared dictionaries
- */
-predicate hasStaticDictionaryFields(RefType container) {
-  exists(Field f |
-    f.getDeclaringType() = container and
-    f.isStatic() and
-    f.getType().getName().matches("Dictionary%")
-  )
-}
-
-/**
- * Determines if there's evidence of multi-threading in the class
- */
-predicate hasMultiThreadingEvidence(RefType container) {
-  exists(Method m | m.getDeclaringType() = container and hasThreadingKeywords(m)) or
-  hasThreadingCalls(container) or
-  hasStaticDictionaryFields(container)
-}
-
-from MethodCall dictCall, RefType containerClass
+from MethodCall dictCall
 where
   isDictionaryOperation(dictCall) and
-  containerClass = dictCall.getEnclosingCallable().getDeclaringType() and
-  hasMultiThreadingEvidence(containerClass) and
+  (
+    // Dictionary access within Task.Run, Thread.Start, etc.
+    isCallWithinThreadingContext(dictCall) or
+    // Access to static dictionary fields (likely shared across threads)
+    isStaticDictionaryAccess(dictCall) or
+    // Dictionary access in methods with threading keywords
+    isThreadingMethod(dictCall.getEnclosingCallable())
+  ) and
+  // Not protected by locking
   not isCallWithinLock(dictCall)
 select dictCall, 
   "Dictionary access in multi-threaded context without proper locking. " +
