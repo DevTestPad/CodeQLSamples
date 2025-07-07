@@ -11,11 +11,18 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisMode>Recommended</AnalysisMode> <!-- Or AllEnabledByDefault -->
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors> <!-- Optional -->
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EditorConfigFiles Remove="C:\temp\codeql\CodeQLSamples\.editorconfig" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="C:\temp\codeql\CodeQLSamples\.editorconfig" />
   </ItemGroup>
 
 </Project>
