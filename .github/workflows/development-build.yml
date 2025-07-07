@@ -1,0 +1,101 @@
+name: Development Build
+
+# This workflow runs only on manual trigger (workflow_dispatch)
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+      verbosity:
+        description: 'Build verbosity level'
+        required: false
+        default: 'normal'
+        type: choice
+        options:
+          - quiet
+          - minimal
+          - normal
+          - detailed
+          - diagnostic
+
+jobs:
+  build:
+    name: Build Project
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Display build configuration
+      run: |
+        Write-Host "Building with configuration: ${{ github.event.inputs.configuration }}"
+        Write-Host "Build verbosity: ${{ github.event.inputs.verbosity }}"
+        Write-Host "Triggered by: ${{ github.actor }}"
+      shell: pwsh
+      
+    - name: Restore dependencies
+      run: dotnet restore CodeQLSamples.sln --verbosity ${{ github.event.inputs.verbosity }}
+      
+    - name: Build solution
+      run: dotnet build CodeQLSamples.sln --configuration ${{ github.event.inputs.configuration }} --no-restore --verbosity ${{ github.event.inputs.verbosity }}
+      
+    - name: Build summary
+      run: |
+        Write-Host "✅ Build completed successfully!"
+        Write-Host "Configuration: ${{ github.event.inputs.configuration }}"
+        Write-Host "Solution: CodeQLSamples.sln"
+        
+        # Display build artifacts location
+        if (Test-Path "bin") {
+          Write-Host "`n📁 Build artifacts:"
+          Get-ChildItem -Path "bin" -Recurse -Directory | ForEach-Object {
+            Write-Host "  - $($_.FullName)"
+          }
+        }
+      shell: pwsh
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts-${{ github.event.inputs.configuration }}
+        path: |
+          bin/
+          obj/
+        retention-days: 7
+        
+  build-info:
+    name: Build Information
+    runs-on: ubuntu-latest
+    if: always()
+    needs: build
+    
+    steps:
+    - name: Display build results
+      run: |
+        echo "🔨 Development Build Summary"
+        echo "=========================="
+        echo "Repository: ${{ github.repository }}"
+        echo "Triggered by: ${{ github.actor }}"
+        echo "Configuration: ${{ github.event.inputs.configuration }}"
+        echo "Verbosity: ${{ github.event.inputs.verbosity }}"
+        echo "Build Status: ${{ needs.build.result }}"
+        echo "Workflow Run: ${{ github.run_number }}"
+        echo ""
+        if [ "${{ needs.build.result }}" == "success" ]; then
+          echo "✅ Build completed successfully!"
+          echo "Build artifacts are available for download for 7 days."
+        else
+          echo "❌ Build failed. Check the build job logs for details."
+        fi
