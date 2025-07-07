@@ -4,6 +4,9 @@ This repository contains custom CodeQL queries for C# code analysis, focusing on
 
 This is a POC sample to explore custom CodeQL queries for specific .NET best practice checks.  There is likely room for improvement and the potential for false positives as some of these scenarios can be complex in nature.
 
+To run VS Code analysis for comparison, build with a release configuration
+dotnet build -c Release CodeQlSamples.sln
+
 ## Overview
 
 These custom queries extend CodeQL's built-in analysis capabilities to detect specific patterns that can lead to security vulnerabilities, resource leaks, and maintainability issues in C# codebases.

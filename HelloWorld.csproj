@@ -7,6 +7,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+<!-- Only enable analyzers during Release builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisMode>Recommended</AnalysisMode> <!-- Or AllEnabledByDefault -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors> <!-- Optional -->
+  </PropertyGroup>
+  
   <ItemGroup>
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
   </ItemGroup>
